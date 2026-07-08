@@ -12,11 +12,13 @@ Terraform creates the OCI resources. The OCI Function is the runtime action that
 
 OCI Resource Manager runs Terraform, but it does not build and push Docker images for OCI Functions. This stack includes the Function source in `function/`, and Terraform expects the image to already exist in OCIR through the `function_image` variable.
 
+For the complete validated walkthrough, including OCIR, Resource Manager variables, manual IAM, alarm validation, Function logs, and end-to-end testing, use `TUTORIAL.md`.
+
 ## Files
 
 - `versions.tf`: Terraform and OCI provider requirements.
 - `variables.tf`: Stack inputs for Resource Manager.
-- `main.tf`: Health Check, alarm, topic, Function, subscription, dynamic group, and policy.
+- `main.tf`: Health Check, alarm, topic, Function, subscription, and optional dynamic group/policy.
 - `outputs.tf`: OCIDs, alarm query, and IAM statements.
 - `schema.yaml`: Resource Manager input form metadata.
 - `function/`: Python Function that starts the standby VM.
@@ -42,31 +44,33 @@ Allow service faas to read repos in tenancy
 
 ## Create the Resource Manager stack
 
-Create a zip from this directory:
+For the guided setup, use the versioned package without Resource Manager schema metadata:
+
+```text
+oci-healthcheck-failover-resource-manager-20260708-v3-no-schema.zip
+```
+
+If you need to create a fresh zip from this directory:
 
 ```bash
 cd oci-healthcheck-failover-resource-manager
-zip -r ../oci-healthcheck-failover-resource-manager.zip . -x '*.terraform*' '*.tfstate*'
-```
-
-If the Resource Manager schema form gives validation trouble, upload a zip without `schema.yaml`. Resource Manager can still read the Terraform variables directly:
-
-```bash
 ./scripts/package-resource-manager.sh
 ```
+
+The package script excludes `schema.yaml`. This is intentional: Resource Manager can still read Terraform variables directly, and the no-schema package avoids schema form validation problems.
 
 Then in OCI Console:
 
 1. Go to **Developer Services -> Resource Manager -> Stacks**.
 2. Create a stack from **My configuration**.
-3. Upload `oci-healthcheck-failover-resource-manager.zip`.
+3. Upload `oci-healthcheck-failover-resource-manager-20260708-v3-no-schema.zip`.
 4. Fill the required variables.
 5. Run **Plan**.
 6. Run **Apply**.
 
 ## Required variables
 
-- `region`: OCI region, for example `sa-saopaulo-1`.
+- `region`: OCI region, for example `sa-vinhedo-1`.
 - `tenancy_ocid`: tenancy OCID.
 - `compartment_ocid`: compartment for the Health Check, alarm, topic, and Function.
 - `standby_instance_ocid`: stopped VM that should be started when the alarm fires.
@@ -74,6 +78,7 @@ Then in OCI Console:
 - `healthcheck_path`: path, for example `/health-check`.
 - `function_image`: full OCIR image name.
 - `function_subnet_ocid`: subnet OCID for the Functions application.
+- `create_identity_resources`: keep `false` for this workflow and create IAM manually in the tenancy home region.
 
 If the standby VM is in another compartment, set `compute_compartment_ocid`.
 
@@ -97,6 +102,25 @@ By default, the stack does not create IAM resources:
 
 This avoids OCI Identity failures when the stack runs outside the tenancy home region. Create IAM manually in the tenancy home region after apply.
 
+Manual IAM requires two separate resources:
+
+```text
+Dynamic Group = matches the Function resource
+Policy = grants that Dynamic Group permission to start the standby VM
+```
+
+Dynamic Group matching rule:
+
+```text
+ALL {resource.type = 'fnfunc', resource.id = '<function_id>'}
+```
+
+Policy statement:
+
+```text
+Allow dynamic-group dg-healthcheck-failover-fn to manage instance-family in compartment id <compute_compartment_ocid>
+```
+
 When `create_identity_resources = true`, the stack creates:
 
 - a dynamic group matching only the created Function OCID;
@@ -110,7 +134,7 @@ Allow dynamic-group <dynamic_group_name> to manage instance-family in compartmen
 
 For the Vinhedo flow in `TUTORIAL.md`, keep `create_identity_resources = false`, run the stack once, copy the `dynamic_group_matching_rule` and `iam_policy_statements` outputs, and create equivalent IAM resources manually in the home region.
 
-IAM propagation can take a minute or two after apply.
+IAM propagation can take 2 to 5 minutes after apply.
 
 ## Network requirements
 
@@ -126,11 +150,20 @@ The Health Check target must be reachable from OCI Health Checks vantage points.
 
 After apply:
 
-1. Confirm the email subscription if you set `notification_email`.
-2. Stop the standby instance.
-3. Temporarily make `/health-check` return a failing status.
-4. Wait for `alarm_pending_duration`.
-5. Confirm the alarm enters `FIRING`.
-6. Confirm the Function starts the standby instance.
+1. Create the Dynamic Group and Policy manually in the home region.
+2. Wait a few minutes for IAM propagation.
+3. Test the Function directly:
+
+```bash
+export FUNCTION_ID="<function_id>"
+./scripts/test-function-invoke.sh
+```
+
+4. Confirm the direct response is `action START` or `action noop`.
+5. Stop the standby instance.
+6. Temporarily make `/health-check` return a failing status.
+7. Confirm `HTTP.StatusCode` reaches `500`.
+8. Confirm the alarm enters `FIRING`.
+9. Confirm the Function starts the standby instance.
 
 To avoid accidental failover during testing, you can temporarily point `standby_instance_ocid` to a disposable stopped VM.

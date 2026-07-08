@@ -8,6 +8,17 @@ Health Check HTTP -> Monitoring Alarm -> Notifications Topic -> OCI Function -> 
 
 Use este tutorial em uma tenancy onde voce seja admin. Os recursos da solucao ficam em Vinhedo; os recursos de IAM, como Dynamic Group e Policy, devem ser criados manualmente na home region da tenancy quando ela for diferente de Vinhedo.
 
+Fluxo validado no teste final:
+
+```text
+/health-check retornou 500
+Health Check publicou HTTP.StatusCode = 500
+Alarm entrou em Firing
+Topic chamou a Function
+Function usou Resource Principal
+VM standby saiu de STOPPED para RUNNING
+```
+
 ## 1. Pre-requisitos
 
 Voce precisa ter:
@@ -312,6 +323,15 @@ Depois do Apply, voce cria o IAM manualmente seguindo o passo 11.
 
 Observacao: como `create_identity_resources = false`, o campo `allow_faas_to_read_repos` nao cria nada. A permissao para Functions lerem o OCIR privado sera criada manualmente na Policy.
 
+Atencao: Dynamic Group e Policy sao telas diferentes.
+
+```text
+Dynamic Group = define quem e a Function
+Policy = define o que essa Function pode fazer
+```
+
+Nao cole uma policy dentro da regra do Dynamic Group. A regra do Dynamic Group deve ter formato `ALL {...}`.
+
 ### 9.6 Alarme
 
 Pode deixar assim:
@@ -402,6 +422,20 @@ Matching rule = ALL {resource.type = 'fnfunc', resource.id = '<function_id>'}
 
 Substitua `<function_id>` pelo output `function_id` da Stack.
 
+Exemplo de regra correta:
+
+```text
+ALL {resource.type = 'fnfunc', resource.id = 'ocid1.fnfunc.oc1.sa-vinhedo-1.aaaaaaaa...'}
+```
+
+Exemplo do que nao deve ser colocado no Dynamic Group:
+
+```text
+Allow dynamic-group dg-healthcheck-failover-fn to manage instance-family in compartment id ocid1.compartment...
+```
+
+Esse texto acima e Policy, nao matching rule.
+
 Depois crie a Policy:
 
 ```text
@@ -424,7 +458,15 @@ Allow service faas to read repos in tenancy
 
 Se a VM standby estiver no mesmo compartment da Stack, use o mesmo OCID de `compartment_ocid` no lugar de `<compute_compartment_ocid>`.
 
-Aguarde 1 a 3 minutos para propagacao de IAM antes do teste ponta a ponta.
+Aguarde 2 a 5 minutos para propagacao de IAM antes do teste da Function.
+
+Para validar se a Function ja enxerga a VM standby, use o teste direto do passo 14. O erro classico quando IAM ainda esta errado e:
+
+```text
+NotAuthorizedOrNotFound
+operation_name: get_instance
+FunctionInvokeExecutionFailed 502
+```
 
 ## 12. Conferir recursos criados
 
@@ -489,6 +531,67 @@ resourceId = <OCID_DO_HTTP_MONITOR>
 
 Sem essa dimensao, o alarme pode ficar sem dados ou avaliar streams erradas.
 
+O toggle `Aggregate metric streams` deve ficar desabilitado quando a dimensao `resourceId` esta preenchida. Isso e esperado: o alarm esta avaliando o HTTP Monitor especifico.
+
+Para conferir a definicao do alarm pela CLI:
+
+```bash
+export ALARM_ID="<alarm_id>"
+
+oci monitoring alarm get \
+  --alarm-id "$ALARM_ID" \
+  --query 'data.{enabled:"is-enabled",pendingDuration:"pending-duration",query:query,severity:severity,state:"lifecycle-state"}' \
+  --output json
+```
+
+Resultado esperado:
+
+```text
+enabled = true
+pendingDuration = PT1M
+query contem HTTP.StatusCode[1m]{resourceId = "..."} .mean() >= 400
+severity = CRITICAL
+state = ACTIVE
+```
+
+Importante: `state = ACTIVE` nesse comando e o lifecycle state do recurso Alarm. Ele nao e o estado operacional `OK` ou `FIRING`.
+
+Para consultar o estado operacional do alarm:
+
+```bash
+export COMPARTMENT_ID="<compartment_ocid>"
+export ALARM_NAME="healthcheck-failover-health-failed"
+
+oci monitoring alarm-status list-alarms-status \
+  --compartment-id "$COMPARTMENT_ID" \
+  --display-name "$ALARM_NAME" \
+  --output json
+```
+
+Para consultar o estado por stream/vantage point:
+
+```bash
+oci monitoring alarm-dimension-states-collection retrieve-dimension-states \
+  --alarm-id "$ALARM_ID" \
+  --output json
+```
+
+Para validar a metrica que alimenta o alarm:
+
+```bash
+export HTTP_MONITOR_ID="<http_monitor_id>"
+
+oci monitoring metric-data summarize-metrics-data \
+  --compartment-id "$COMPARTMENT_ID" \
+  --namespace oci_healthchecks \
+  --query-text "HTTP.StatusCode[1m]{resourceId = \"${HTTP_MONITOR_ID}\"}.mean()" \
+  --start-time "$(date -u -d '10 minutes ago' +%Y-%m-%dT%H:%M:%SZ)" \
+  --end-time "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+  --output json
+```
+
+Se aparecer `500.0` por mais de 1 minuto e o alarm ainda estiver `OK`, abra o alarm no Console, clique em `Edit alarm` e salve sem alterar nada. Isso forca a reavaliacao da definicao.
+
 ## 14. Teste ponta a ponta
 
 Antes de forcar falha no health check, valide a Function diretamente.
@@ -514,6 +617,35 @@ action noop = a VM standby ja estava ligada ou em outro estado que nao STOPPED
 NotAuthorizedOrNotFound ou erro 502 = revisar Dynamic Group e Policy
 ```
 
+Exemplo de sucesso:
+
+```text
+{'action': 'START', 'instance_ocid': 'ocid1.instance...', 'previous_state': 'STOPPED'}
+```
+
+Depois confirme a VM:
+
+```bash
+export STANDBY_INSTANCE_OCID="<standby_instance_ocid>"
+
+oci compute instance get \
+  --instance-id "$STANDBY_INSTANCE_OCID" \
+  --query 'data."lifecycle-state"' \
+  --raw-output
+```
+
+Resultado esperado:
+
+```text
+STARTING
+```
+
+e depois:
+
+```text
+RUNNING
+```
+
 Depois que o teste direto passar, valide o fluxo completo.
 
 Deixe a VM standby parada.
@@ -530,7 +662,14 @@ Resultado esperado:
 HTTP/1.0 500 Internal Server Error
 ```
 
-Aguarde 1 a 3 minutos.
+O tempo normal para o alarm mudar para `Firing` e de 2 a 4 minutos:
+
+```text
+Health Check interval: 60 segundos
+Alarm interval: 1 minuto
+Trigger delay: 1 minuto
+Console/API: alguns segundos ate cerca de 1 minuto
+```
 
 Confira o Alarm:
 
@@ -613,6 +752,7 @@ Function nao foi chamada:
 - Confira o Topic do alarme.
 - Confira a subscription `ORACLE_FUNCTIONS`.
 - Confira se o Alarm usa `Send raw messages`.
+- Confira se o alarm realmente ficou `FIRING` usando `oci monitoring alarm-status list-alarms-status`.
 
 Function foi chamada, mas deu erro `NotAuthorizedOrNotFound`:
 
@@ -628,6 +768,16 @@ ALL {resource.type = 'fnfunc', resource.id = '<function_id>'}
 ```text
 Allow dynamic-group dg-healthcheck-failover-fn to manage instance-family in compartment id <compute_compartment_ocid>
 ```
+
+- Confirme que a Policy foi criada na home region da tenancy.
+- Confirme que `<compute_compartment_ocid>` e o compartment real da VM standby.
+- Se quiser isolar problema de escopo, teste temporariamente:
+
+```text
+Allow dynamic-group dg-healthcheck-failover-fn to manage instance-family in tenancy
+```
+
+Se funcionar com `in tenancy`, a Function esta correta e o problema era apenas o escopo da Policy.
 
 Function nao consegue puxar imagem:
 
@@ -652,3 +802,17 @@ Depois do teste:
 - Restaure o endpoint `/health-check` para retornar `200`.
 - Aguarde o alarme voltar para `OK`.
 - Se necessario, pare novamente a VM standby.
+
+## 18. Checklist final de sucesso
+
+Considere a solucao validada quando todos estes pontos passarem:
+
+```text
+curl /health-check retorna 500 durante o teste
+metric-data mostra HTTP.StatusCode = 500
+alarm-status mostra FIRING
+Function metrics mostra invocacao
+Function logs nao mostram erro 502
+VM standby muda de STOPPED para STARTING/RUNNING
+Ao voltar /health-check para 200, o alarm retorna para OK
+```
