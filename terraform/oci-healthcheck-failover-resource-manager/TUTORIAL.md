@@ -190,33 +190,73 @@ oci-healthcheck-failover-resource-manager-20260708-v3-no-schema.zip
 
 ## 9. Variaveis principais da Stack
 
-Preencha:
+Use esta secao como checklist. Os exemplos mostram o formato esperado; troque pelos OCIDs e valores do seu tenancy.
+
+### 9.1 Variaveis obrigatorias
 
 ```text
 region = sa-vinhedo-1
-tenancy_ocid = <OCID_DA_TENANCY>
-compartment_ocid = <OCID_DO_COMPARTMENT>
+tenancy_ocid = ocid1.tenancy.oc1..aaaaaaaa...
+compartment_ocid = ocid1.compartment.oc1..aaaaaaaa...
 name_prefix = healthcheck-failover
 ```
 
-VM standby:
+Explicacao rapida:
 
 ```text
-standby_instance_ocid = <OCID_DA_VM_STANDBY_PARADA>
+region = regiao onde tudo sera criado
+tenancy_ocid = OCID da tenancy nova
+compartment_ocid = compartment onde Health Check, Alarm, Topic e Function serao criados
+name_prefix = prefixo dos nomes dos recursos
 ```
 
-Health Check:
+### 9.2 VM standby
+
+Esta e a VM que esta parada e deve ser ligada quando o health check falhar.
 
 ```text
-healthcheck_target = <IP_OU_HOST_SEM_HTTP_E_SEM_PATH>
+standby_instance_ocid = ocid1.instance.oc1.sa-vinhedo-1.an...
+```
+
+Se a VM standby estiver no mesmo compartment de `compartment_ocid`, deixe o campo `compute_compartment_ocid` em branco.
+
+```text
+compute_compartment_ocid = <deixe_em_branco>
+```
+
+Se a VM standby estiver em outro compartment:
+
+```text
+compute_compartment_ocid = ocid1.compartment.oc1..aaaaaaaa...
+```
+
+### 9.3 Health Check
+
+Exemplo para monitorar `http://203.0.113.10/health-check`:
+
+```text
+healthcheck_target = 203.0.113.10
 healthcheck_path = /health-check
 healthcheck_protocol = HTTP
 healthcheck_port = 80
 healthcheck_interval_in_seconds = 60
 healthcheck_timeout_in_seconds = 10
+healthcheck_headers = {}
 ```
 
-Function:
+Regras importantes:
+
+```text
+healthcheck_target = somente IP ou host, sem http:// e sem caminho
+healthcheck_path = somente o caminho, comecando com /
+healthcheck_headers = {} quando nao precisa de headers
+```
+
+### 9.4 Function
+
+Use a imagem que voce subiu no OCIR do tenancy novo.
+
+Se a imagem for x86/amd64:
 
 ```text
 function_image = vcp.ocir.io/<namespace>/failover/start-standby:1.0.0
@@ -226,14 +266,30 @@ function_timeout_in_seconds = 120
 function_shape = GENERIC_X86
 ```
 
-Se o build foi feito com `PLATFORM=linux/arm64`, use:
+Se a imagem for ARM:
 
 ```text
 function_image = vcp.ocir.io/<namespace>/failover/start-standby:1.0.0-arm64
+function_subnet_ocid = <OCID_DA_SUBNET_DA_FUNCTION>
+function_memory_in_mbs = 256
+function_timeout_in_seconds = 120
 function_shape = GENERIC_ARM
 ```
 
-IAM:
+Substitua `<namespace>` pelo namespace do tenancy novo. Exemplo de formato:
+
+```text
+function_image = vcp.ocir.io/<namespace>/failover/start-standby:1.0.0
+```
+
+Deixe estes vazios, a menos que voce saiba que precisa deles:
+
+```text
+function_subnet_ocids = []
+function_nsg_ocids = []
+```
+
+### 9.5 IAM
 
 ```text
 create_identity_resources = true
@@ -242,20 +298,50 @@ dynamic_group_name = dg-healthcheck-failover-fn
 policy_name = policy-healthcheck-failover-fn
 ```
 
-Alarme:
+Use `create_identity_resources = true` quando voce for admin da tenancy. Isso cria o Dynamic Group e a Policy para a Function poder ligar a VM standby.
+
+Use `allow_faas_to_read_repos = true` se o repositorio OCIR estiver privado.
+
+### 9.6 Alarme
+
+Pode deixar assim:
 
 ```text
 unhealthy_http_status_code_threshold = 400
 alarm_pending_duration = PT1M
 alarm_repeat_notification_duration = PT30M
 alarm_severity = CRITICAL
-alarm_query_override = vazio
+alarm_query_override = <deixe_em_branco>
 ```
 
-Se a VM standby estiver em outro compartment, preencha:
+Explicacao rapida:
 
 ```text
-compute_compartment_ocid = <OCID_DO_COMPARTMENT_DA_VM_STANDBY>
+unhealthy_http_status_code_threshold = dispara com HTTP 400 ou maior
+alarm_pending_duration = espera 1 minuto antes de entrar em FIRING
+alarm_query_override = deixe vazio para o Terraform montar a query correta
+```
+
+### 9.7 O que pode ficar no padrao
+
+Se o formulario mostrar estes campos, pode deixar como esta:
+
+```text
+healthcheck_method = GET
+healthcheck_vantage_point_names = []
+alarm_namespace = oci_healthchecks
+notification_email = <deixe_em_branco>
+freeform_tags = padrao
+```
+
+Antes de rodar o Plan, valide principalmente:
+
+```text
+standby_instance_ocid aponta para a VM parada
+healthcheck_target aponta para a VM/app principal
+function_image existe no OCIR do tenancy novo
+function_shape bate com a arquitetura da imagem
+function_subnet_ocid e uma subnet com saida para OCI APIs
 ```
 
 ## 10. Rodar Plan e Apply
