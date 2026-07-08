@@ -9,8 +9,31 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 HOST = os.getenv("HOST", "0.0.0.0")
 PORT = int(os.getenv("PORT", "80"))
+DEFAULT_HEALTHCHECK_STATUS_CODE = 200
 HEALTHY_PATHS = ("/health-check", "/health", "/healthz")
 UNHEALTHY_PATHS = ("/health-check-error", "/health-error", "/healthz-error")
+
+
+def healthcheck_status_code() -> int:
+    raw_status_code = os.getenv("HEALTHCHECK_STATUS_CODE", str(DEFAULT_HEALTHCHECK_STATUS_CODE)).strip()
+    try:
+        status_code = int(raw_status_code)
+    except ValueError:
+        return DEFAULT_HEALTHCHECK_STATUS_CODE
+
+    if 100 <= status_code <= 599:
+        return status_code
+
+    return DEFAULT_HEALTHCHECK_STATUS_CODE
+
+
+def write_healthcheck_response(handler: BaseHTTPRequestHandler, status_code: int) -> None:
+    body = b"OK\n" if status_code < 400 else b"ERROR\n"
+    handler.send_response(status_code)
+    handler.send_header("Content-Type", "text/plain; charset=utf-8")
+    handler.send_header("Cache-Control", "no-store")
+    handler.end_headers()
+    handler.wfile.write(body)
 
 
 def render_home() -> bytes:
@@ -185,19 +208,11 @@ class Handler(BaseHTTPRequestHandler):
         path = self.path.split("?", 1)[0]
 
         if path in HEALTHY_PATHS:
-            self.send_response(HTTPStatus.OK)
-            self.send_header("Content-Type", "text/plain; charset=utf-8")
-            self.send_header("Cache-Control", "no-store")
-            self.end_headers()
-            self.wfile.write(b"OK\n")
+            write_healthcheck_response(self, healthcheck_status_code())
             return
 
         if path in UNHEALTHY_PATHS:
-            self.send_response(HTTPStatus.INTERNAL_SERVER_ERROR)
-            self.send_header("Content-Type", "text/plain; charset=utf-8")
-            self.send_header("Cache-Control", "no-store")
-            self.end_headers()
-            self.wfile.write(b"ERROR\n")
+            write_healthcheck_response(self, HTTPStatus.INTERNAL_SERVER_ERROR)
             return
 
         if path not in ("/", "/index.html"):

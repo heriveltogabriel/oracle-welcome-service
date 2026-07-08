@@ -7,6 +7,7 @@ Aplicação Python simples para validar VM Linux, Load Balancer, Instance Pool e
 - Sobe uma página web "Bem-vindo Oracle".
 - Escuta por padrão em `0.0.0.0:80`.
 - Expõe health check em `/health-check`, `/health` e `/healthz`.
+- Permite controlar o status de `/health-check` pela variável `HEALTHCHECK_STATUS_CODE`.
 - Expõe health check de erro em `/health-check-error`, `/health-error` e `/healthz-error`.
 - Instala serviço `systemd` chamado `oracle-welcome`.
 - Roda com usuário dedicado, sem rodar a aplicação como root.
@@ -33,6 +34,43 @@ Resultados esperados:
 ```text
 /health-check        -> HTTP 200, corpo OK
 /health-check-error  -> HTTP 500, corpo ERROR
+```
+
+## Simular falha no mesmo `/health-check`
+
+Por padrão, `/health-check` retorna `200`. Para fazer o mesmo endpoint retornar `500`, edite o override do serviço:
+
+```bash
+sudo EDITOR=vi systemctl edit oracle-welcome
+```
+
+Coloque:
+
+```ini
+[Service]
+Environment=HEALTHCHECK_STATUS_CODE=500
+```
+
+Salve e reinicie:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl restart oracle-welcome
+curl -i http://127.0.0.1/health-check
+```
+
+Para voltar para OK, troque para:
+
+```ini
+[Service]
+Environment=HEALTHCHECK_STATUS_CODE=200
+```
+
+Depois rode:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl restart oracle-welcome
 ```
 
 Ver status:

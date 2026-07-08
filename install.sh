@@ -6,6 +6,7 @@ SERVICE_NAME="${SERVICE_NAME:-oracle-welcome}"
 INSTALL_DIR="${INSTALL_DIR:-/opt/oracle-welcome}"
 PORT="${PORT:-80}"
 HOST="${HOST:-0.0.0.0}"
+HEALTHCHECK_STATUS_CODE="${HEALTHCHECK_STATUS_CODE:-200}"
 SERVICE_USER="${SERVICE_USER:-oracle-welcome}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP_SOURCE="${SCRIPT_DIR}/app.py"
@@ -100,6 +101,7 @@ Group=${SERVICE_USER}
 WorkingDirectory=${INSTALL_DIR}
 Environment=HOST=${HOST}
 Environment=PORT=${PORT}
+Environment=HEALTHCHECK_STATUS_CODE=${HEALTHCHECK_STATUS_CODE}
 ExecStart=${PYTHON_BIN} ${INSTALL_DIR}/app.py
 Restart=always
 RestartSec=3
@@ -139,4 +141,5 @@ echo
 echo "Instalação concluída."
 echo "Abra no navegador: http://IP_DA_VM/"
 echo "Health check para Load Balancer/OCI Health Checks: http://IP_DA_VM/health-check"
+echo "Controle de status: HEALTHCHECK_STATUS_CODE=${HEALTHCHECK_STATUS_CODE}"
 echo "Health check de erro para teste: http://IP_DA_VM/health-check-error"
