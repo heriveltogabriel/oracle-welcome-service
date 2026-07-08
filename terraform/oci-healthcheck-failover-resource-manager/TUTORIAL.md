@@ -43,25 +43,35 @@ curl -i http://<IP_DA_VM_PRINCIPAL>/health-check
 
 Para o teste de failover, ele deve retornar `500`.
 
-## 3. Descompactar o pacote no Cloud Shell
+## 3. Descompactar o pacote v3 no Cloud Shell
 
-Envie o zip do projeto para o Cloud Shell, descompacte e entre no diretorio:
+Envie o zip v3 do projeto para o Cloud Shell, descompacte e entre no diretorio.
+
+Use este arquivo:
+
+```text
+oci-healthcheck-failover-resource-manager-20260708-v3-no-schema.zip
+```
+
+O caminho por upload e o principal, porque em alguns ambientes o `git clone` pelo Cloud Shell pode ser bloqueado.
 
 ```bash
 mkdir oci-healthcheck-failover-resource-manager
-unzip oci-healthcheck-failover-resource-manager-no-schema.zip -d oci-healthcheck-failover-resource-manager
+unzip oci-healthcheck-failover-resource-manager-20260708-v3-no-schema.zip -d oci-healthcheck-failover-resource-manager
 cd oci-healthcheck-failover-resource-manager
 ```
 
 Se voce ja estiver em um diretorio que contem `main.tf`, `variables.tf` e `function/`, pode seguir dali.
 
-## 4. Descobrir namespace e login no OCIR
+## 4. Descobrir o namespace e fazer login no OCIR
 
 Pegue o namespace:
 
 ```bash
 oci os ns get --query data --raw-output
 ```
+
+Sempre que o tutorial mostrar `<namespace>`, substitua pelo valor retornado por esse comando.
 
 Faca login no OCIR de Vinhedo:
 
@@ -74,12 +84,6 @@ Use:
 ```text
 Username: <namespace>/<seu_usuario_oci>
 Password: Auth Token do OCI
-```
-
-Exemplo de username:
-
-```text
-idi1o0a010nx/herivelto.santos@oracle.com
 ```
 
 ## 5. Criar repositorio OCIR
@@ -102,7 +106,31 @@ Pode ser privado. Se for privado, mantenha `allow_faas_to_read_repos = true` no 
 
 No Cloud Shell, dentro do diretorio do projeto:
 
+Primeiro confira a arquitetura do Cloud Shell:
+
 ```bash
+uname -m
+```
+
+Se retornar `aarch64`, use imagem ARM:
+
+```bash
+export PLATFORM=linux/arm64
+export FUNCTION_IMAGE="vcp.ocir.io/<namespace>/failover/start-standby:1.0.0-arm64"
+./scripts/build-and-push-function.sh
+```
+
+Nesse caso, no Resource Manager use:
+
+```text
+function_image = vcp.ocir.io/<namespace>/failover/start-standby:1.0.0-arm64
+function_shape = GENERIC_ARM
+```
+
+Se retornar `x86_64`, use imagem x86:
+
+```bash
+export PLATFORM=linux/amd64
 export FUNCTION_IMAGE="vcp.ocir.io/<namespace>/failover/start-standby:1.0.0"
 ./scripts/build-and-push-function.sh
 ```
@@ -113,18 +141,30 @@ Confirme no OCIR se a imagem apareceu como:
 failover/start-standby:1.0.0
 ```
 
-## 7. Criar o zip para Resource Manager
+ou, se voce usou ARM:
 
-Use o pacote sem schema para evitar problemas de formulario no Resource Manager:
+```text
+failover/start-standby:1.0.0-arm64
+```
+
+## 7. Separar o zip para Resource Manager
+
+Para o Resource Manager, use a versao v3 sem schema:
+
+```text
+oci-healthcheck-failover-resource-manager-20260708-v3-no-schema.zip
+```
+
+Se voce alterar arquivos do Terraform depois, pode gerar um novo pacote com:
 
 ```bash
 ./scripts/package-resource-manager.sh
 ```
 
-O comando gera um arquivo com nome parecido com:
+Mas para este passo a passo, o pacote base esperado e:
 
 ```text
-oci-healthcheck-failover-resource-manager-20260708173500-no-schema.zip
+oci-healthcheck-failover-resource-manager-20260708-v3-no-schema.zip
 ```
 
 ## 8. Criar a Stack no Resource Manager
@@ -145,7 +185,7 @@ Upload zip file
 Suba:
 
 ```text
-oci-healthcheck-failover-resource-manager-no-schema.zip
+oci-healthcheck-failover-resource-manager-20260708-v3-no-schema.zip
 ```
 
 ## 9. Variaveis principais da Stack
@@ -184,6 +224,13 @@ function_subnet_ocid = <OCID_DA_SUBNET_DA_FUNCTION>
 function_memory_in_mbs = 256
 function_timeout_in_seconds = 120
 function_shape = GENERIC_X86
+```
+
+Se o build foi feito com `PLATFORM=linux/arm64`, use:
+
+```text
+function_image = vcp.ocir.io/<namespace>/failover/start-standby:1.0.0-arm64
+function_shape = GENERIC_ARM
 ```
 
 IAM:
