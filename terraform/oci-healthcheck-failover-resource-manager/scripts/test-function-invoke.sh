@@ -44,12 +44,13 @@ echo "Payload:"
 cat "${PAYLOAD_FILE}"
 echo
 
+PAYLOAD_BODY="$(cat "${PAYLOAD_FILE}")"
 rm -f "${RESPONSE_FILE}"
 
 echo "Invoking Function..."
 oci fn function invoke \
   --function-id "${FUNCTION_ID}" \
-  --body "file://${PAYLOAD_FILE}" \
+  --body "${PAYLOAD_BODY}" \
   --file "${RESPONSE_FILE}"
 
 echo
