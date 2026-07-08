@@ -491,6 +491,31 @@ Sem essa dimensao, o alarme pode ficar sem dados ou avaliar streams erradas.
 
 ## 14. Teste ponta a ponta
 
+Antes de forcar falha no health check, valide a Function diretamente.
+
+Pegue o output `function_id` da Stack e rode:
+
+```bash
+export FUNCTION_ID="<function_id>"
+./scripts/test-function-invoke.sh
+```
+
+Ou:
+
+```bash
+./scripts/test-function-invoke.sh "<function_id>"
+```
+
+Resultados esperados:
+
+```text
+action START = a Function pediu START da VM standby
+action noop = a VM standby ja estava ligada ou em outro estado que nao STOPPED
+NotAuthorizedOrNotFound ou erro 502 = revisar Dynamic Group e Policy
+```
+
+Depois que o teste direto passar, valide o fluxo completo.
+
 Deixe a VM standby parada.
 
 Force o endpoint monitorado a retornar erro:
