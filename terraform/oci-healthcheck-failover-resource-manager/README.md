@@ -34,7 +34,7 @@ export FUNCTION_IMAGE='vcp.ocir.io/<namespace>/failover/start-standby:1.0.0'
 
 Use the same value for the Resource Manager variable `function_image`.
 
-If the Function cannot pull the image at runtime, set `allow_faas_to_read_repos = true` in the stack variables, or create this policy manually:
+If the Function cannot pull the image at runtime and `create_identity_resources = false`, create this policy manually in the tenancy home region:
 
 ```text
 Allow service faas to read repos in tenancy
@@ -91,7 +91,13 @@ After apply, check the `alarm_query` output and confirm in **Monitoring -> Alarm
 
 ## IAM behavior
 
-By default, the stack creates:
+By default, the stack does not create IAM resources:
+
+- `create_identity_resources = false`
+
+This avoids OCI Identity failures when the stack runs outside the tenancy home region. Create IAM manually in the tenancy home region after apply.
+
+When `create_identity_resources = true`, the stack creates:
 
 - a dynamic group matching only the created Function OCID;
 - a policy allowing that dynamic group to manage compute instances in the standby VM compartment.
@@ -102,7 +108,7 @@ The policy statement is intentionally broad enough to make the `START` action wo
 Allow dynamic-group <dynamic_group_name> to manage instance-family in compartment id <compute_compartment_ocid>
 ```
 
-If your tenancy requires stricter IAM, set `create_identity_resources = false`, run the stack once, copy the `dynamic_group_matching_rule` and `iam_policy_statements` outputs, and create equivalent IAM resources manually.
+For the Vinhedo flow in `TUTORIAL.md`, keep `create_identity_resources = false`, run the stack once, copy the `dynamic_group_matching_rule` and `iam_policy_statements` outputs, and create equivalent IAM resources manually in the home region.
 
 IAM propagation can take a minute or two after apply.
 

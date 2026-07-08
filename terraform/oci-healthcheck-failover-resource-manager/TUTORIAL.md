@@ -6,7 +6,7 @@ Este guia monta a solucao completa:
 Health Check HTTP -> Monitoring Alarm -> Notifications Topic -> OCI Function -> START da VM standby
 ```
 
-Use este tutorial em uma tenancy onde voce seja admin. Assim o Terraform consegue criar tambem o Dynamic Group e a Policy da Function.
+Use este tutorial em uma tenancy onde voce seja admin. Os recursos da solucao ficam em Vinhedo; os recursos de IAM, como Dynamic Group e Policy, devem ser criados manualmente na home region da tenancy quando ela for diferente de Vinhedo.
 
 ## 1. Pre-requisitos
 
@@ -16,7 +16,7 @@ Voce precisa ter:
 - Uma VM standby parada, que sera ligada quando o alarme disparar.
 - Um compartment para criar Health Check, Alarm, Topic, Function e logs.
 - Uma subnet para OCI Functions com saida para APIs OCI na porta 443.
-- Permissao de admin para criar Dynamic Group e Policy.
+- Permissao de admin para criar Dynamic Group e Policy manualmente na home region da tenancy.
 - Cloud Shell ou uma maquina com Docker/Podman, OCI CLI e acesso ao OCIR.
 
 Para Vinhedo:
@@ -100,7 +100,7 @@ Crie o repositorio:
 failover/start-standby
 ```
 
-Pode ser privado. Se for privado, mantenha `allow_faas_to_read_repos = true` no stack.
+Pode ser privado. Neste tutorial a permissao para a Function ler repos privados sera criada manualmente na Policy do passo 11.
 
 ## 6. Build e push da imagem da Function
 
@@ -291,16 +291,26 @@ function_nsg_ocids = []
 
 ### 9.5 IAM
 
+Para este tutorial, deixe obrigatoriamente:
+
 ```text
-create_identity_resources = true
-allow_faas_to_read_repos = true
+create_identity_resources = false
+allow_faas_to_read_repos = false
 dynamic_group_name = dg-healthcheck-failover-fn
 policy_name = policy-healthcheck-failover-fn
 ```
 
-Use `create_identity_resources = true` quando voce for admin da tenancy. Isso cria o Dynamic Group e a Policy para a Function poder ligar a VM standby.
+Motivo:
 
-Use `allow_faas_to_read_repos = true` se o repositorio OCIR estiver privado.
+```text
+Dynamic Group e Policy sao recursos de IAM da tenancy.
+Eles so podem ser criados/alterados na home region da tenancy.
+Se a Stack esta em Vinhedo e a home region for GRU, o Apply falha com erro 403.
+```
+
+Depois do Apply, voce cria o IAM manualmente seguindo o passo 11.
+
+Observacao: como `create_identity_resources = false`, o campo `allow_faas_to_read_repos` nao cria nada. A permissao para Functions lerem o OCIR privado sera criada manualmente na Policy.
 
 ### 9.6 Alarme
 
@@ -367,7 +377,56 @@ dynamic_group_matching_rule
 iam_policy_statements
 ```
 
-## 11. Conferir recursos criados
+## 11. Criar IAM manualmente na home region
+
+Este passo e obrigatorio quando `create_identity_resources = false`.
+
+No Console OCI, mude a regiao para a home region da tenancy. No erro anterior, a home region apareceu como:
+
+```text
+GRU / sa-saopaulo-1
+```
+
+Crie o Dynamic Group:
+
+```text
+Identity & Security > Domains > Dynamic Groups > Create dynamic group
+```
+
+Use:
+
+```text
+Name = dg-healthcheck-failover-fn
+Matching rule = ALL {resource.type = 'fnfunc', resource.id = '<function_id>'}
+```
+
+Substitua `<function_id>` pelo output `function_id` da Stack.
+
+Depois crie a Policy:
+
+```text
+Identity & Security > Policies > Create policy
+```
+
+Use:
+
+```text
+Name = policy-healthcheck-failover-fn
+Compartment = tenancy root ou compartment de IAM usado pela sua organizacao
+```
+
+Statements:
+
+```text
+Allow dynamic-group dg-healthcheck-failover-fn to manage instance-family in compartment id <compute_compartment_ocid>
+Allow service faas to read repos in tenancy
+```
+
+Se a VM standby estiver no mesmo compartment da Stack, use o mesmo OCID de `compartment_ocid` no lugar de `<compute_compartment_ocid>`.
+
+Aguarde 1 a 3 minutos para propagacao de IAM antes do teste ponta a ponta.
+
+## 12. Conferir recursos criados
 
 Health Check:
 
@@ -400,7 +459,7 @@ Identity & Security > Domains > Dynamic Groups
 Identity & Security > Policies
 ```
 
-## 12. Validar a configuracao do Alarm
+## 13. Validar a configuracao do Alarm
 
 O Terraform ja cria a query correta:
 
@@ -430,7 +489,7 @@ resourceId = <OCID_DO_HTTP_MONITOR>
 
 Sem essa dimensao, o alarme pode ficar sem dados ou avaliar streams erradas.
 
-## 13. Teste ponta a ponta
+## 14. Teste ponta a ponta
 
 Deixe a VM standby parada.
 
@@ -485,7 +544,7 @@ Estado esperado:
 Starting ou Running
 ```
 
-## 14. Logs da Function
+## 15. Logs da Function
 
 Para ver logs:
 
@@ -515,7 +574,7 @@ START
 Standby instance
 ```
 
-## 15. Troubleshooting
+## 16. Troubleshooting
 
 Alarme nao entra em Firing:
 
@@ -561,7 +620,7 @@ VM nao inicia mesmo sem erro:
 - Confira se a VM esta em `STOPPED`.
 - Confira limites/capacidade da tenancy.
 
-## 16. Voltar o ambiente ao normal
+## 17. Voltar o ambiente ao normal
 
 Depois do teste:
 

@@ -21,8 +21,10 @@ compute_compartment_ocid = ""
 # Optional: override if the default Health Checks MQL does not match your tenancy metrics.
 alarm_query_override = ""
 
-# For an admin tenancy test, leave this true so Terraform creates the Dynamic Group and Policy.
-create_identity_resources = true
+# Keep false when the stack runs outside the tenancy home region.
+# Create the Dynamic Group and Policy manually in the home region after apply.
+create_identity_resources = false
 
-# Enable this when the Function image is in a private OCIR repository.
-allow_faas_to_read_repos = true
+# Has effect only when create_identity_resources = true.
+# In the tutorial flow, create the equivalent policy manually.
+allow_faas_to_read_repos = false

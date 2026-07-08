@@ -200,9 +200,9 @@ variable "function_shape" {
 }
 
 variable "create_identity_resources" {
-  description = "Create the dynamic group and policy that allow the Function to start the standby VM."
+  description = "Create the dynamic group and policy that allow the Function to start the standby VM. Keep false when running the stack outside the tenancy home region; create IAM manually in the home region."
   type        = bool
-  default     = true
+  default     = false
 }
 
 variable "dynamic_group_name" {
