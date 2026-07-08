@@ -1,0 +1,245 @@
+title: "OCI Health Check Failover"
+description: "Monitors an HTTP health-check endpoint and starts a stopped standby compute instance through OCI Functions."
+schemaVersion: 1.1.0
+version: "20260708"
+locale: "en"
+
+variableGroups:
+  - title: "OCI Placement"
+    variables:
+      - region
+      - tenancy_ocid
+      - compartment_ocid
+      - compute_compartment_ocid
+      - name_prefix
+  - title: "Health Check"
+    variables:
+      - healthcheck_target
+      - healthcheck_path
+      - healthcheck_protocol
+      - healthcheck_port
+      - healthcheck_method
+      - healthcheck_interval_in_seconds
+      - healthcheck_timeout_in_seconds
+      - healthcheck_headers
+      - healthcheck_vantage_point_names
+  - title: "Alarm"
+    variables:
+      - alarm_query_override
+      - unhealthy_http_status_code_threshold
+      - alarm_pending_duration
+      - alarm_repeat_notification_duration
+      - alarm_severity
+      - notification_email
+  - title: "Failover Function"
+    variables:
+      - standby_instance_ocid
+      - function_image
+      - function_subnet_ocid
+      - function_subnet_ocids
+      - function_nsg_ocids
+      - function_memory_in_mbs
+      - function_timeout_in_seconds
+      - function_shape
+  - title: "IAM"
+    variables:
+      - create_identity_resources
+      - dynamic_group_name
+      - policy_name
+      - allow_faas_to_read_repos
+  - title: "Tags"
+    variables:
+      - freeform_tags
+
+variables:
+  region:
+    type: string
+    required: true
+    title: "OCI region"
+    description: "Example: sa-saopaulo-1"
+
+  tenancy_ocid:
+    type: string
+    required: true
+    title: "Tenancy OCID"
+
+  compartment_ocid:
+    type: oci:identity:compartment:id
+    required: true
+    title: "Resource compartment"
+
+  compute_compartment_ocid:
+    type: oci:identity:compartment:id
+    required: false
+    title: "Compute compartment"
+    description: "Leave empty if the standby VM is in the resource compartment."
+
+  name_prefix:
+    type: string
+    required: true
+    title: "Name prefix"
+
+  standby_instance_ocid:
+    type: string
+    required: true
+    title: "Standby instance OCID"
+
+  healthcheck_target:
+    type: string
+    required: true
+    title: "Health Check target host"
+    description: "Hostname or IP only, without protocol or path."
+
+  healthcheck_path:
+    type: string
+    required: true
+    title: "Health Check path"
+
+  healthcheck_protocol:
+    type: enum
+    required: true
+    title: "Health Check protocol"
+    enum:
+      - HTTP
+      - HTTPS
+
+  healthcheck_port:
+    type: integer
+    required: true
+    title: "Health Check port"
+
+  healthcheck_method:
+    type: string
+    required: true
+    title: "Health Check method"
+
+  healthcheck_interval_in_seconds:
+    type: enum
+    required: true
+    title: "Probe interval"
+    enum:
+      - 10
+      - 30
+      - 60
+
+  healthcheck_timeout_in_seconds:
+    type: enum
+    required: true
+    title: "Probe timeout"
+    enum:
+      - 10
+      - 20
+      - 30
+      - 60
+
+  healthcheck_headers:
+    type: map
+    required: false
+    title: "HTTP headers"
+
+  healthcheck_vantage_point_names:
+    type: list
+    required: false
+    title: "Vantage point names"
+
+  alarm_query_override:
+    type: string
+    required: false
+    title: "Alarm MQL override"
+    description: "Leave empty to use HTTP.StatusCode[1m]{resourceId = <monitor OCID>}.mean() >= threshold."
+    multiLine: true
+
+  unhealthy_http_status_code_threshold:
+    type: integer
+    required: true
+    title: "HTTP status failure threshold"
+
+  alarm_pending_duration:
+    type: string
+    required: true
+    title: "Alarm pending duration"
+
+  alarm_repeat_notification_duration:
+    type: string
+    required: false
+    title: "Repeat notification duration"
+
+  alarm_severity:
+    type: enum
+    required: true
+    title: "Alarm severity"
+    enum:
+      - CRITICAL
+      - ERROR
+      - WARNING
+      - INFO
+
+  notification_email:
+    type: string
+    required: false
+    title: "Optional notification email"
+
+  function_image:
+    type: string
+    required: true
+    title: "Function OCIR image"
+
+  function_subnet_ocid:
+    type: string
+    required: true
+    title: "Function subnet OCID"
+    description: "Single subnet OCID for the Functions application. Use this field first."
+
+  function_subnet_ocids:
+    type: list
+    required: false
+    title: "Additional Function subnet OCIDs"
+
+  function_nsg_ocids:
+    type: list
+    required: false
+    title: "Function NSG OCIDs"
+
+  function_memory_in_mbs:
+    type: integer
+    required: true
+    title: "Function memory"
+
+  function_timeout_in_seconds:
+    type: integer
+    required: true
+    title: "Function timeout"
+
+  function_shape:
+    type: enum
+    required: true
+    title: "Function shape"
+    enum:
+      - GENERIC_X86
+      - GENERIC_ARM
+      - GENERIC_X86_ARM
+
+  create_identity_resources:
+    type: boolean
+    required: true
+    title: "Create IAM resources"
+
+  dynamic_group_name:
+    type: string
+    required: true
+    title: "Dynamic group name"
+
+  policy_name:
+    type: string
+    required: true
+    title: "Policy name"
+
+  allow_faas_to_read_repos:
+    type: boolean
+    required: true
+    title: "Allow Functions service to read OCIR repos"
+
+  freeform_tags:
+    type: map
+    required: false
+    title: "Free-form tags"

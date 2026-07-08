@@ -1,0 +1,28 @@
+region            = "sa-vinhedo-1"
+tenancy_ocid      = "ocid1.tenancy.oc1..example"
+compartment_ocid  = "ocid1.compartment.oc1..example"
+name_prefix       = "healthcheck-failover"
+
+standby_instance_ocid = "ocid1.instance.oc1.sa-vinhedo-1.example"
+
+healthcheck_target   = "167.126.22.81"
+healthcheck_path     = "/health-check"
+healthcheck_protocol = "HTTP"
+healthcheck_port     = 80
+
+function_image       = "vcp.ocir.io/<namespace>/failover/start-standby:1.0.0"
+function_subnet_ocid = "ocid1.subnet.oc1.sa-vinhedo-1.example"
+
+notification_email = "you@example.com"
+
+# Set this only if the standby VM is in another compartment.
+compute_compartment_ocid = ""
+
+# Optional: override if the default Health Checks MQL does not match your tenancy metrics.
+alarm_query_override = ""
+
+# For an admin tenancy test, leave this true so Terraform creates the Dynamic Group and Policy.
+create_identity_resources = true
+
+# Enable this when the Function image is in a private OCIR repository.
+allow_faas_to_read_repos = true

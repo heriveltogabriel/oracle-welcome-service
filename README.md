@@ -2,6 +2,13 @@
 
 Aplicação Python simples para validar VM Linux, Load Balancer, Instance Pool e autoscaling no OCI.
 
+Este repositório também inclui o stack Terraform/Resource Manager para o failover automático via OCI Health Checks:
+
+```text
+terraform/oci-healthcheck-failover-resource-manager/
+terraform/oci-healthcheck-failover-resource-manager-20260708-v3-no-schema.zip
+```
+
 ## O que ela faz
 
 - Sobe uma página web "Bem-vindo Oracle".
@@ -20,6 +27,31 @@ Copie a pasta `oracle-welcome-service` para a VM e rode:
 cd oracle-welcome-service
 sudo bash install.sh
 ```
+
+## Usar o Terraform no Cloud Shell
+
+No Cloud Shell:
+
+```bash
+git clone https://github.com/heriveltogabriel/oracle-welcome-service.git
+cd oracle-welcome-service/terraform/oci-healthcheck-failover-resource-manager
+```
+
+O zip pronto para upload no Resource Manager fica em:
+
+```text
+../oci-healthcheck-failover-resource-manager-20260708-v3-no-schema.zip
+```
+
+Para criar a imagem da OCI Function:
+
+```bash
+export NAMESPACE=$(oci os ns get --query data --raw-output)
+export FUNCTION_IMAGE="vcp.ocir.io/${NAMESPACE}/failover/start-standby:1.0.0"
+./scripts/build-and-push-function.sh
+```
+
+Depois use o zip `no-schema` para criar a stack no Resource Manager.
 
 Teste local na VM:
 
