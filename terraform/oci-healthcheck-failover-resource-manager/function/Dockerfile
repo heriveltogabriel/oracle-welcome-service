@@ -1,4 +1,4 @@
-FROM docker.io/fnproject/python:3.11-dev
+FROM docker.io/library/python:3.11-slim
 
 WORKDIR /function
 ENV PIP_TARGET=/python
