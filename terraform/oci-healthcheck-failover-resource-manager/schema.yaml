@@ -138,9 +138,10 @@ variables:
     title: "HTTP headers"
 
   healthcheck_vantage_point_names:
-    type: list
+    type: string
     required: false
     title: "Vantage point names"
+    description: "Leave empty to let OCI select them automatically. Optional CSV example: azr-sat,goo-cbf,aws-fra."
 
   alarm_query_override:
     type: string
@@ -191,14 +192,16 @@ variables:
     description: "Single subnet OCID for the Functions application. Use this field first."
 
   function_subnet_ocids:
-    type: list
+    type: string
     required: false
     title: "Additional Function subnet OCIDs"
+    description: "Leave empty unless you need multiple subnets. Optional CSV example: ocid1.subnet...,ocid1.subnet..."
 
   function_nsg_ocids:
-    type: list
+    type: string
     required: false
     title: "Function NSG OCIDs"
+    description: "Leave empty unless you need NSGs. Optional CSV example: ocid1.networksecuritygroup...,ocid1.networksecuritygroup..."
 
   function_memory_in_mbs:
     type: integer

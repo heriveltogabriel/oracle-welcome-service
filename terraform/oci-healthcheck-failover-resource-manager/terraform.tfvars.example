@@ -9,9 +9,14 @@ healthcheck_target   = "167.126.22.81"
 healthcheck_path     = "/health-check"
 healthcheck_protocol = "HTTP"
 healthcheck_port     = 80
+# Leave empty to let OCI select vantage points, or use CSV:
+# healthcheck_vantage_point_names = "azr-sat,goo-cbf,aws-fra"
+healthcheck_vantage_point_names = ""
 
 function_image       = "vcp.ocir.io/<namespace>/failover/start-standby:1.0.0"
 function_subnet_ocid = "ocid1.subnet.oc1.sa-vinhedo-1.example"
+function_subnet_ocids = ""
+function_nsg_ocids    = ""
 
 notification_email = "you@example.com"
 

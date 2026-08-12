@@ -103,9 +103,9 @@ variable "healthcheck_headers" {
 }
 
 variable "healthcheck_vantage_point_names" {
-  description = "Optional OCI Health Checks vantage point names. Leave empty to let OCI select them automatically."
-  type        = list(string)
-  default     = []
+  description = "Optional OCI Health Checks vantage point names. Leave empty to let OCI select them automatically. Accepts CSV, for example azr-sat,goo-cbf,aws-fra, or JSON list syntax."
+  type        = string
+  default     = ""
 }
 
 variable "alarm_namespace" {
@@ -155,15 +155,15 @@ variable "function_subnet_ocid" {
 }
 
 variable "function_subnet_ocids" {
-  description = "Optional additional subnet OCIDs where the OCI Functions application will run. Leave empty unless you need multiple subnets."
-  type        = list(string)
-  default     = []
+  description = "Optional additional subnet OCIDs where the OCI Functions application will run. Leave empty unless you need multiple subnets. Accepts CSV or JSON list syntax."
+  type        = string
+  default     = ""
 }
 
 variable "function_nsg_ocids" {
-  description = "Optional Network Security Group OCIDs for the OCI Functions application."
-  type        = list(string)
-  default     = []
+  description = "Optional Network Security Group OCIDs for the OCI Functions application. Accepts CSV or JSON list syntax."
+  type        = string
+  default     = ""
 }
 
 variable "function_image" {

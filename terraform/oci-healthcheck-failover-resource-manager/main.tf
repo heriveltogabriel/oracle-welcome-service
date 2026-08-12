@@ -6,6 +6,39 @@ locals {
   alarm_query         = trimspace(var.alarm_query_override) != "" ? var.alarm_query_override : local.default_alarm_query
 
   alarm_repeat_notification_duration = trimspace(var.alarm_repeat_notification_duration) != "" ? var.alarm_repeat_notification_duration : null
+  raw_healthcheck_vantage_point_names = trimspace(var.healthcheck_vantage_point_names)
+  healthcheck_vantage_point_names = (
+    local.raw_healthcheck_vantage_point_names == "" ? [] :
+    can(tolist(jsondecode(local.raw_healthcheck_vantage_point_names))) ? [
+      for name in tolist(jsondecode(local.raw_healthcheck_vantage_point_names)) : tostring(name)
+    ] :
+    [
+      for name in split(",", local.raw_healthcheck_vantage_point_names) : trimspace(name)
+      if trimspace(name) != ""
+    ]
+  )
+  raw_function_subnet_ocids = trimspace(var.function_subnet_ocids)
+  function_subnet_ocids = (
+    local.raw_function_subnet_ocids == "" ? [] :
+    can(tolist(jsondecode(local.raw_function_subnet_ocids))) ? [
+      for ocid in tolist(jsondecode(local.raw_function_subnet_ocids)) : tostring(ocid)
+    ] :
+    [
+      for ocid in split(",", local.raw_function_subnet_ocids) : trimspace(ocid)
+      if trimspace(ocid) != ""
+    ]
+  )
+  raw_function_nsg_ocids = trimspace(var.function_nsg_ocids)
+  function_nsg_ocids = (
+    local.raw_function_nsg_ocids == "" ? [] :
+    can(tolist(jsondecode(local.raw_function_nsg_ocids))) ? [
+      for ocid in tolist(jsondecode(local.raw_function_nsg_ocids)) : tostring(ocid)
+    ] :
+    [
+      for ocid in split(",", local.raw_function_nsg_ocids) : trimspace(ocid)
+      if trimspace(ocid) != ""
+    ]
+  )
 
   function_config = {
     OCI_REGION            = var.region
@@ -14,7 +47,7 @@ locals {
     REQUIRE_FIRING_STATE  = "true"
   }
 
-  function_subnet_ids = distinct(compact(concat([trimspace(var.function_subnet_ocid)], var.function_subnet_ocids)))
+  function_subnet_ids = distinct(compact(concat([trimspace(var.function_subnet_ocid)], local.function_subnet_ocids)))
 
   identity_policy_statements = concat(
     [
@@ -37,7 +70,7 @@ resource "oci_health_checks_http_monitor" "app" {
   timeout_in_seconds  = var.healthcheck_timeout_in_seconds
 
   headers             = var.healthcheck_headers
-  vantage_point_names = length(var.healthcheck_vantage_point_names) > 0 ? var.healthcheck_vantage_point_names : null
+  vantage_point_names = length(local.healthcheck_vantage_point_names) > 0 ? local.healthcheck_vantage_point_names : null
   freeform_tags       = var.freeform_tags
 }
 
@@ -70,7 +103,7 @@ resource "oci_functions_application" "failover" {
   compartment_id             = var.compartment_ocid
   display_name               = "${var.name_prefix}-fn-app"
   subnet_ids                 = local.function_subnet_ids
-  network_security_group_ids = length(var.function_nsg_ocids) > 0 ? var.function_nsg_ocids : null
+  network_security_group_ids = length(local.function_nsg_ocids) > 0 ? local.function_nsg_ocids : null
   shape                      = var.function_shape
   freeform_tags              = var.freeform_tags
 

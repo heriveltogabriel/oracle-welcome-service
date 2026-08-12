@@ -54,21 +54,21 @@ curl -i http://<IP_DA_VM_PRINCIPAL>/health-check
 
 Para o teste de failover, ele deve retornar `500`.
 
-## 3. Descompactar o pacote v3 no Cloud Shell
+## 3. Descompactar o pacote v4 no Cloud Shell
 
-Envie o zip v3 do projeto para o Cloud Shell, descompacte e entre no diretorio.
+Envie o zip v4 do projeto para o Cloud Shell, descompacte e entre no diretorio.
 
 Use este arquivo:
 
 ```text
-oci-healthcheck-failover-resource-manager-20260708-v3-no-schema.zip
+oci-healthcheck-failover-resource-manager-20260812-v4-no-schema.zip
 ```
 
 O caminho por upload e o principal, porque em alguns ambientes o `git clone` pelo Cloud Shell pode ser bloqueado.
 
 ```bash
 mkdir oci-healthcheck-failover-resource-manager
-unzip oci-healthcheck-failover-resource-manager-20260708-v3-no-schema.zip -d oci-healthcheck-failover-resource-manager
+unzip oci-healthcheck-failover-resource-manager-20260812-v4-no-schema.zip -d oci-healthcheck-failover-resource-manager
 cd oci-healthcheck-failover-resource-manager
 ```
 
@@ -160,10 +160,10 @@ failover/start-standby:1.0.0-arm64
 
 ## 7. Separar o zip para Resource Manager
 
-Para o Resource Manager, use a versao v3 sem schema:
+Para o Resource Manager, use a versao v4 sem schema:
 
 ```text
-oci-healthcheck-failover-resource-manager-20260708-v3-no-schema.zip
+oci-healthcheck-failover-resource-manager-20260812-v4-no-schema.zip
 ```
 
 Se voce alterar arquivos do Terraform depois, pode gerar um novo pacote com:
@@ -175,7 +175,7 @@ Se voce alterar arquivos do Terraform depois, pode gerar um novo pacote com:
 Mas para este passo a passo, o pacote base esperado e:
 
 ```text
-oci-healthcheck-failover-resource-manager-20260708-v3-no-schema.zip
+oci-healthcheck-failover-resource-manager-20260812-v4-no-schema.zip
 ```
 
 ## 8. Criar a Stack no Resource Manager
@@ -196,7 +196,7 @@ Upload zip file
 Suba:
 
 ```text
-oci-healthcheck-failover-resource-manager-20260708-v3-no-schema.zip
+oci-healthcheck-failover-resource-manager-20260812-v4-no-schema.zip
 ```
 
 ## 9. Variaveis principais da Stack
@@ -253,6 +253,7 @@ healthcheck_port = 80
 healthcheck_interval_in_seconds = 60
 healthcheck_timeout_in_seconds = 10
 healthcheck_headers = {}
+healthcheck_vantage_point_names = <deixe_em_branco>
 ```
 
 Regras importantes:
@@ -261,6 +262,13 @@ Regras importantes:
 healthcheck_target = somente IP ou host, sem http:// e sem caminho
 healthcheck_path = somente o caminho, comecando com /
 healthcheck_headers = {} quando nao precisa de headers
+healthcheck_vantage_point_names = vazio para o OCI escolher automaticamente
+```
+
+Se quiser fixar vantage points manualmente, use uma lista CSV em uma unica linha:
+
+```text
+healthcheck_vantage_point_names = azr-sat,goo-cbf,aws-fra
 ```
 
 ### 9.4 Function
@@ -296,8 +304,15 @@ function_image = vcp.ocir.io/<namespace>/failover/start-standby:1.0.0
 Deixe estes vazios, a menos que voce saiba que precisa deles:
 
 ```text
-function_subnet_ocids = []
-function_nsg_ocids = []
+function_subnet_ocids = <deixe_em_branco>
+function_nsg_ocids = <deixe_em_branco>
+```
+
+Se precisar informar mais de uma subnet ou NSG, use CSV:
+
+```text
+function_subnet_ocids = ocid1.subnet...,ocid1.subnet...
+function_nsg_ocids = ocid1.networksecuritygroup...,ocid1.networksecuritygroup...
 ```
 
 ### 9.5 IAM
@@ -358,7 +373,7 @@ Se o formulario mostrar estes campos, pode deixar como esta:
 
 ```text
 healthcheck_method = GET
-healthcheck_vantage_point_names = []
+healthcheck_vantage_point_names = <deixe_em_branco>
 alarm_namespace = oci_healthchecks
 notification_email = <deixe_em_branco>
 freeform_tags = padrao

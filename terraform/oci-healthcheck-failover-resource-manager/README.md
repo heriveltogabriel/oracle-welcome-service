@@ -47,7 +47,7 @@ Allow service faas to read repos in tenancy
 For the guided setup, use the versioned package without Resource Manager schema metadata:
 
 ```text
-oci-healthcheck-failover-resource-manager-20260708-v3-no-schema.zip
+oci-healthcheck-failover-resource-manager-20260812-v4-no-schema.zip
 ```
 
 If you need to create a fresh zip from this directory:
@@ -63,7 +63,7 @@ Then in OCI Console:
 
 1. Go to **Developer Services -> Resource Manager -> Stacks**.
 2. Create a stack from **My configuration**.
-3. Upload `oci-healthcheck-failover-resource-manager-20260708-v3-no-schema.zip`.
+3. Upload `oci-healthcheck-failover-resource-manager-20260812-v4-no-schema.zip`.
 4. Fill the required variables.
 5. Run **Plan**.
 6. Run **Apply**.
